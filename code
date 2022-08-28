@@ -1,0 +1,223 @@
+from tkinter import *
+from tkinter import ttk
+from tkinter import messagebox
+
+from heapq import heappush, heappop, heapify
+import collections
+
+
+def huffman_encoding(symb2freq):
+    """ Character encoding using the Huffman technique.
+        Returns a list where each element is a list of the form [character, Huffman code]
+        Using a heap to facilitate data manipulation.
+    """
+
+    heap = [[wt, [sym, ""]] for sym, wt in symb2freq.items()]
+
+    #
+    # transformation of the list into a heap to facilitate data manipulation
+    heapify(heap)
+
+    while len(heap) > 1:
+
+        # the heappop function returns the lightest element of a heap
+        # we recover the 2 lightest elements (i.e. lowest frequency of occurrence) to form a new tree (the lightest of the two elements is placed on the branchde gauche)
+
+        left = heappop(heap)
+        rigth = heappop(heap)
+
+        # Huffman encoding: 0 for left branch and 1 for right branch
+        # Huffman encoding: 0 for left branch and 1 for right branch
+
+        for pair in left[1:]:
+            pair[1] = '0' + pair[1]
+
+        for pair in rigth[1:]:
+            pair[1] = '1' + pair[1]
+
+        # the created tree is added to the heap. Its weight is the sum of the occurrence frequencies of the characters it contains.
+
+        heappush(heap, [left[0] + rigth[0]] + left[1:] + rigth[1:])
+
+    return sorted(heappop(heap)[1:], key=lambda p: (len(p[-1]), p))
+
+
+def text2tree(txt):
+    """ Returns a list of tuples ordered from the highest weight (highest probability of occurrence) to the lowest weight.
+        A list element contains a tuple of the form (symbol, weight, Huffman code).
+    """
+
+    symb2freq = collections.Counter(txt)
+    huff = huffman_encoding(symb2freq)
+
+    return [(p[0], symb2freq[p[0]], p[1], int(symb2freq[p[0]]) * len(p[1])) for p in huff]
+
+
+BIN_HEX = {'0000': '0', '0001': '1', '0010': '2', '0011': '3', '0100': '4', '0101': '5',
+           '0110': '6', '0111': '7', '1000': '8', '1001': '9', '1010': 'A', '1011': 'B',
+           '1100': 'C', '1101': 'D', '1110': 'E', '1111': 'F'}
+
+
+def bin2hexa(binVal):
+    ''' Conversion of a binary character string to hexastring'''
+    output = ""
+    bits = []
+    length = len(binVal)
+    if (length % 4 != 0):
+        for x in range(4 - (length % 4)):
+            binVal += "0"
+            length += 1
+    for i in range(length // 4):
+        bits.append(binVal[i * 4:(4 + (i * 4))])
+    for halfByte in bits:
+        output += BIN_HEX[halfByte]
+    return output
+
+
+class Application(Frame):
+    """ The graphical application is based on the Tkinter module. """
+
+    def __init__(self, master=None):
+
+        super().__init__(master)
+        self.grid()
+
+        # title of application
+        Label(master, text='Huffman compression', font="courier 14 bold").grid(row=0, columnspan=3, pady=(0, 20))
+
+        # north west panel
+        # the user is prompted to type some text
+        # to compress it with the Huffman method, the user must press the button
+        ####################################
+
+        # panel label
+        self.label_for_text = Label(master, text="Text original")
+        self.label_for_text.grid(row=1, column=0, pady=(5, 5))
+
+        # widget text
+        self.text = Text(master, width=50, height=10)
+        self.text.insert(END, "Write here the text to compress. Only ascii characters!")
+        self.text.grid(row=2, padx=10, pady=10)
+
+        Button(master, text='Compress text', command=self.compute_and_display).grid(row=3)
+
+        # north east panel
+        # he results of the calculation of the encoding according to Huffamn are displayed in the form of a table (tree in the tkinter vocabulary)
+        ##################################
+
+        # panel label
+        self.label_for_tree = Label(master, text="Encoding Details")
+        self.label_for_tree.grid(row=1, column=1, pady=(5, 5))
+
+        # creating and formatting the table
+        style = ttk.Style()
+        style.configure("Treeview", font=('courier', 10))
+        self.tree = ttk.Treeview(master, height=10)
+        ysb = ttk.Scrollbar(master, orient='vertical', command=self.tree.yview)
+        self.tree.configure(yscroll=ysb.set)
+        self.tree['show'] = 'headings'  # ne pas afficher la premiere colonne incluse par defaut
+
+        # definition of columns
+        self.tree["columns"] = ("symbol", "frequency", "code", "total_bits")
+
+        self.tree.column("symbol", width=100)
+        self.tree.column("frequency", width=100)
+        self.tree.column("code", width=200)
+        self.tree.column("total_bits", width=100)
+
+        self.tree.heading("symbol", text="Symbol")
+        self.tree.heading("frequency", text="Frequency")
+        self.tree.heading("code", text="Code")
+        self.tree.heading("total_bits", text="Total bits")
+
+        self.tree.grid(row=2, rowspan=2, column=1)
+        ysb.grid(row=2, rowspan=2, column=2)
+
+        # south east panel
+        # Conversion of each character of the text entered by the user to its Huffamn code (binary text)
+        ##################################
+
+        self.label_for_binary_text = Label(master, width=50, text='Text encoded according to Huffman')
+        self.label_for_binary_text.grid(row=4, column=1, pady=(25, 10))
+
+        self.text_binary = Text(master, width=50, height=10)
+        self.text_binary.grid(row=5, column=1)
+
+        # south west panel
+        # Converted south east panel text (binary text) to hexastring to see space compression
+        ##################################
+
+        self.label_for_compressed_text = Label(master, width=50, text='Compress text')
+        self.label_for_compressed_text.grid(row=4, column=0, pady=(25, 10))
+
+        self.text_compressed = Text(master, width=50, height=10)
+        self.text_compressed.grid(row=5, column=0)
+
+    def compute_and_display(self):
+
+        # reset views displaying encoding results
+        self.tree.delete(*self.tree.get_children())
+        self.text_compressed.delete('1.0', END)
+        self.text_binary.delete('1.0', END)
+        text = self.text.get(1.0,
+                             'end-1c')  #can be empty if presence of special characters on some platforms!
+
+        if text:
+
+            self.label_for_text.config(text='Original text in ASCII: {} octets'.format(len(text)))
+
+            matrix = text2tree(text)
+            huffman = {}
+            text_compressed_total_bits = 0
+
+            for row in matrix:
+                # creation of a dictionary to easily convert a character into its Huffman code
+                huffman[row[0]] = row[2]
+                # calculation of the total number of bits used to encode the text according to Huffman
+                text_compressed_total_bits += row[3]
+                # update of the display of the tree with the results of the calculation
+                self.tree.insert('', 'end', values=row)
+
+            # update of the display of the south west panel with the text encoded according to Huffamen and its label indicating the number of characters
+
+            self.text_binary.insert(END, ''.join([huffman[char] for char in text]))
+            self.label_for_binary_text.config(
+                text='Text encoded according to Huffman: {} bits'.format(len(self.text_binary.get(1.0, 'end-1c'))))
+
+            # highlighting of the first 2 characters of Huffman to help the user understand
+
+            char_1_huffman_len = len(huffman[text[0]])
+            char_2_huffman_len = len(huffman[text[1]])
+
+            self.text_binary.tag_add("huffman_1", "1.0", "1.{}".format(char_1_huffman_len))
+            self.text_binary.tag_config("huffman_1", background="yellow")
+
+            self.text_binary.tag_add("huffman_2", "1.{}".format(char_1_huffman_len),
+                                     "1.{}".format(char_1_huffman_len + char_2_huffman_len))
+            self.text_binary.tag_config("huffman_2", background="lightblue")
+
+            # updated south west panel display with compressed text (conversion from binary text to hexadecimal text)
+
+            self.text_compressed.insert(END, bin2hexa(self.text_binary.get(1.0, 'end-1c')))
+            self.label_for_compressed_text.config(
+                text='Compress text: {} octets'.format(len(self.text_compressed.get(1.0, 'end-1c')) // 2))
+
+        else:
+            # it has been found that some platforms do not support special characters in the text field!
+            messagebox.showerror('Error',
+                                 'The text to be compressed cannot be empty or contain special characters')
+            self.text.insert(END, "Write here the text to compress. Only ascii characters !")
+
+
+# tkinter module is used for the realization of the graphical interface
+root = Tk()
+# formatting the main window
+root.config(bd=10)
+root.option_add("*Font", "courier")
+root.wm_title('Huffman')
+root.minsize(width=666, height=600)
+root.resizable(width=False, height=False)
+
+#Launch the gui
+app = Application(master=root)
+app.mainloop()
